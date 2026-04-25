@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Screener — {{TS}}</title>
+<style>
+:root { --bg:#0b0c15; --panel:#121420; --accent:#3b82f6; --text:#e2e8f0; --muted:#8b9bb4; --border:#2a2f45; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; margin:0; padding:24px; }
+.container { max-width:1200px; margin:0 auto; }
+h1 { font-size:26px; margin-bottom:4px; letter-spacing:-.5px; }
+.sub { color:var(--muted); font-size:14px; margin-bottom:8px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:#1a1d2e; color:var(--muted); padding:10px 8px; text-align:left; font-weight:600; position:sticky; top:0; cursor:pointer; user-select:none; }
+th:hover { color:var(--text); }
+th::after { content:' ⇅'; opacity:.4; font-size:11px; }
+td { padding:10px 8px; border-bottom:1px solid var(--border); }
+tr:hover { background:rgba(59,130,246,.06); }
+.sort-asc::after { content:' ▲'; color:var(--accent); opacity:1; }
+.sort-desc::after { content:' ▼'; color:var(--accent); opacity:1; }
+.summary-box { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:18px 22px; margin-bottom:24px; font-size:14px; line-height:1.8; }
+.legend { display:flex; gap:12px; margin-bottom:16px; font-size:12px; color:var(--muted); flex-wrap:wrap; align-items:center; }
+.badge { background:#1a1d2e; padding:4px 10px; border-radius:12px; border:1px solid var(--border); }
+.filter-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.filter-bar input { background:#1a1d2e; color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px; width:100px; }
+.filter-bar button { background:var(--accent); color:white; border:none; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer; }
+.filter-bar button:hover { opacity:.9; }
+.footer { margin-top:24px; font-size:11px; color:var(--muted); opacity:.7; }
+.tabs { display:flex; gap:6px; margin-bottom:16px; }
+.tab-btn { background:#1a1d2e; color:var(--muted); border:1px solid var(--border); border-radius:8px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+.tab-btn.active { background:rgba(59,130,246,.15); color:var(--accent); border-color:var(--accent); }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.th-info{ display:inline-block; margin-left:4px; color:var(--muted); cursor:pointer; font-size:11px; background:rgba(59,130,246,.1); border-radius:50%; width:14px; height:14px; line-height:14px; text-align:center; vertical-align:middle; }
+.th-info:hover{ color:var(--accent); background:rgba(59,130,246,.2); }
+.tooltip-box{ position:absolute; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--text); max-width:260px; z-index:100; box-shadow:0 4px 16px rgba(0,0,0,.4); line-height:1.5; display:none; }
+.tooltip-box b{ color:var(--accent); }
+.tooltip-close{ position:absolute; top:2px; right:6px; cursor:pointer; color:var(--muted); font-size:14px; }
+.hidden-row { display:none !important; }
+</style>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#3b82f6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+<div class="container">
+<h1>Daily Short Screener</h1>
+<div class="sub">Overextended · Short Interest · Squeeze Radar — {{TS}}</div>
+{{SUMMARY_BLOCK}}
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('overext',this)">Overextended</button>
+  <button class="tab-btn" onclick="switchTab('shortint',this)">Short Interest</button>
+  <button class="tab-btn" onclick="switchTab('squeeze',this)">Squeeze Radar</button>
+</div>
+<div class="legend">
+  <span class="badge">Filters:</span>
+  <div class="filter-bar">
+    <label>Price ≥</label>
+    <input id="filterPrice" type="number" value="1" min="0" step="0.01">
+    <label>Vol ≥</label>
+    <input id="filterVol" type="number" value="100000" min="0" step="1000" title="raw daily volume (e.g. 500000)">
+    <button onclick="applyFilters()">Apply</button>
+    <button style="background:transparent;border:1px solid var(--border);color:var(--muted);" onclick="resetFilters()">Reset</button>
+  </div>
+</div>
+
+<div id="overext" class="tab-content active">
+<table id="tblOverext">
+<thead><tr>
+<th onclick="sortTable('tblOverext',0,'str')">Ticker</th>
+<th onclick="sortTable('tblOverext',1,'num')">Short Score<span class="th-info" onclick="explainTerm(event,'Short Score')">?</span></th>
+<th onclick="sortTable('tblOverext',2,'num')">Price<span class="th-info" onclick="explainTerm(event,'Price')">?</span></th>
+<th onclick="sortTable('tblOverext',3,'num')">RSI(14)<span class="th-info" onclick="explainTerm(event,'RSI(14)')">?</span></th>
+<th onclick="sortTable('tblOverext',4,'num')">BB %B<span class="th-info" onclick="explainTerm(event,'BB %B')">?</span></th>
+<th onclick="sortTable('tblOverext',5,'num')">Dist EMA20<span class="th-info" onclick="explainTerm(event,'Dist EMA20')">?</span></th>
+<th onclick="sortTable('tblOverext',6,'num')">Dist SMA50<span class="th-info" onclick="explainTerm(event,'Dist SMA50')">?</span></th>
+<th onclick="sortTable('tblOverext',7,'num')">Chg 1D<span class="th-info" onclick="explainTerm(event,'Chg 1D')">?</span></th>
+<th onclick="sortTable('tblOverext',8,'num')">Chg 5D<span class="th-info" onclick="explainTerm(event,'Chg 5D')">?</span></th>
+<th onclick="sortTable('tblOverext',9,'num')">Vol Ratio<span class="th-info" onclick="explainTerm(event,'Vol Ratio')">?</span></th>
+<th onclick="sortTable('tblOverext',10,'num')">WT1<span class="th-info" onclick="explainTerm(event,'WT1')">?</span></th>
+</tr></thead>
+<tbody>{{OVEREXT_ROWS}}</tbody>
+</table>
+</div>
+
+<div id="shortint" class="tab-content">
+<table id="tblShortInt">
+<thead><tr>
+<th onclick="sortTable('tblShortInt',0,'str')">Ticker</th>
+<th onclick="sortTable('tblShortInt',1,'num')">Price<span class="th-info" onclick="explainTerm(event,'Price')">?</span></th>
+<th onclick="sortTable('tblShortInt',2,'num')">Short % Float<span class="th-info" onclick="explainTerm(event,'Short % Float')">?</span></th>
+<th onclick="sortTable('tblShortInt',3,'num')">Days to Cover<span class="th-info" onclick="explainTerm(event,'Days to Cover')">?</span></th>
+<th onclick="sortTable('tblShortInt',4,'num')">Shares Short<span class="th-info" onclick="explainTerm(event,'Shares Short')">?</span></th>
+<th onclick="sortTable('tblShortInt',5,'num')">Squeeze Risk<span class="th-info" onclick="explainTerm(event,'Squeeze Risk')">?</span></th>
+</tr></thead>
+<tbody>{{SHORT_ROWS}}</tbody>
+</table>
+</div>
+
+<div id="squeeze" class="tab-content">
+<table id="tblSqueeze">
+<thead><tr>
+<th onclick="sortTable('tblSqueeze',0,'str')">Ticker</th>
+<th onclick="sortTable('tblSqueeze',1,'num')">Price<span class="th-info" onclick="explainTerm(event,'Price')">?</span></th>
+<th onclick="sortTable('tblSqueeze',2,'num')">Squeeze Score<span class="th-info" onclick="explainTerm(event,'Squeeze Score')">?</span></th>
+<th onclick="sortTable('tblSqueeze',3,'str')">Signals<span class="th-info" onclick="explainTerm(event,'Signals')">?</span></th>
+<th onclick="sortTable('tblSqueeze',4,'num')">Chg 1D<span class="th-info" onclick="explainTerm(event,'Chg 1D')">?</span></th>
+<th onclick="sortTable('tblSqueeze',5,'num')">Chg 5D<span class="th-info" onclick="explainTerm(event,'Chg 5D')">?</span></th>
+<th onclick="sortTable('tblSqueeze',6,'num')">Vol Ratio<span class="th-info" onclick="explainTerm(event,'Vol Ratio')">?</span></th>
+<th onclick="sortTable('tblSqueeze',7,'num')">BB Width<span class="th-info" onclick="explainTerm(event,'BB Width')">?</span></th>
+<th onclick="sortTable('tblSqueeze',8,'num')">RSI<span class="th-info" onclick="explainTerm(event,'RSI(14)')">?</span></th>
+<th onclick="sortTable('tblSqueeze',9,'num')">Dist Low52w<span class="th-info" onclick="explainTerm(event,'Dist Low52w')">?</span></th>
+<th onclick="sortTable('tblSqueeze',10,'num')">Dist High52w<span class="th-info" onclick="explainTerm(event,'Dist High52w')">?</span></th>
+<th onclick="sortTable('tblSqueeze',11,'num')">Support<span class="th-info" onclick="explainTerm(event,'Support')">?</span></th>
+<th onclick="sortTable('tblSqueeze',12,'num')">Resistance<span class="th-info" onclick="explainTerm(event,'Resistance')">?</span></th>
+</tr></thead>
+<tbody>{{SQUEEZE_ROWS}}</tbody>
+</table>
+</div>
+
+<div class="footer">
+Disclaimer: Research only. Short selling carries unlimited loss risk. Always use stops and position sizing.
+</div>
+</div>
+<script>
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(e=>e.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+let sortDir={};
+function sortTable(tableId,col,type){
+  const table=document.getElementById(tableId);
+  const tbody=table.querySelector('tbody');
+  const activeRows=Array.from(tbody.querySelectorAll('tr:not(.hidden-row)'));
+  const headers=table.querySelectorAll('th');
+  headers.forEach(h=>h.classList.remove('sort-asc','sort-desc'));
+  const dir=sortDir[tableId+'_'+col]==='desc'?'asc':'desc';
+  sortDir[tableId+'_'+col]=dir;
+  headers[col].classList.add(dir==='desc'?'sort-desc':'sort-asc');
+  activeRows.sort((a,b)=>{
+    let av=a.children[col]?.getAttribute('data-sort')||a.children[col]?.innerText||'-999';
+    let bv=b.children[col]?.getAttribute('data-sort')||b.children[col]?.innerText||'-999';
+    if(type==='num'){av=parseFloat(av);bv=parseFloat(bv);if(isNaN(av))av=-1e9;if(isNaN(bv))bv=-1e9;}
+    if(type==='str'){av=av.toString().toLowerCase();bv=bv.toString().toLowerCase();}
+    if(dir==='desc') return av>bv?-1:(av<bv?1:0);
+    return av>bv?1:(av<bv?-1:0);
+  });
+  activeRows.forEach(r=>tbody.appendChild(r));
+}
+
+let tooltipEl=null;
+function showTooltip(txt,el){
+  if(!tooltipEl){ tooltipEl=document.createElement('div'); tooltipEl.className='tooltip-box'; tooltipEl.innerHTML='<span class="tooltip-close" onclick="hideTooltip()">×</span><span id="tt-body"></span>'; document.body.appendChild(tooltipEl); }
+  document.getElementById('tt-body').innerHTML=txt;
+  tooltipEl.style.display='block';
+  const rect=el.getBoundingClientRect();
+  let top=rect.bottom+window.scrollY+6;
+  let left=rect.left+window.scrollX-30;
+  if(left+280>window.innerWidth) left=window.innerWidth-295;
+  tooltipEl.style.top=top+'px';
+  tooltipEl.style.left=left+'px';
+}
+function hideTooltip(){ if(tooltipEl) tooltipEl.style.display='none'; }
+function explainTerm(e,term){
+  const defs={
+    "Ticker":"<b>Stock Ticker Symbol</b><br>The unique abbreviation used to identify a company on the stock exchange (e.g. AAPL = Apple, TSLA = Tesla).",
+    "Price":"<b>Last Closing Price</b><br>The stock's price at the close of the most recent trading session in USD.",
+    "Short Score":"<b>Composite Short Candidate Score (0–100+)</b><br>Combines RSI, Bollinger Bands %B, distance from EMA20/SMA50, price change, volume spikes, Wavetrend indicator, and MACD divergence into a single number. Higher = more overextended and potentially a better short setup.",
+    "RSI(14)":"<b>Relative Strength Index</b><br>A momentum oscillator (0–100). Values > 70 suggest overbought (potential pullback). Values < 30 suggest oversold (potential bounce).",
+    "BB %B":"<b>Bollinger Bands %B</b><br>Shows where the price sits relative to the upper and lower Bollinger bands. 0 = lower band, 1 = upper band. Values > 0.9 mean the stock is hugging the upper band (extreme) and may revert.",
+    "Dist EMA20":"<b>Distance from EMA20</b><br>% above or below the 20-day Exponential Moving Average. Large positive values = price stretched far above short-term average (reversion risk).",
+    "Dist SMA50":"<b>Distance from SMA50</b><br>% above or below the 50-day Simple Moving Average. Tracks medium-term trend stretch.",
+    "Chg 1D":"<b>1-Day % Change</b><br>How much the stock moved in the last trading session. Large green days can signal euphoria (short entry) or momentum (squeeze fuel).",
+    "Chg 5D":"<b>5-Day % Change</b><br>Percentage change over the last 5 trading sessions. Shows recent trend strength. Parabolic 5D moves often face sharp pullbacks.",
+    "Vol Ratio":"<b>Volume Ratio</b><br>Today's volume divided by the 20-day average. Values > 2.0 mean unusually heavy trading. High volume on big up days = distribution or climax buying.",
+    "WT1":"<b>Wavetrend Indicator Channel Line 1</b><br>A smoothed oscillator derived from price channels. High positive values suggest the move is extended and late-stage. Crosses below zero can signal trend reversal.",
+    "Squeeze Score":"<b>Squeeze Radar Composite Score (0–100)</b><br>Multi-signal scoring for pre-squeeze / breakout setups. Triggers: BB Squeeze, Volume Spike, RSI Recovery, Low Base Rally, EMA/SMA Pressure, Meme Momentum, Consolidation Break. Higher = more signals firing simultaneously.",
+    "Signals":"<b>Active Squeeze/Breakout Signals</b><br>A comma-separated list of which technical conditions triggered for this stock. Hover cells for live color coding: red = strong squeeze, orange = moderate.",
+    "BB Width":"<b>Bollinger Band Width %</b><br>Width of the Bollinger Bands as a percentage of the middle SMA. Narrow bands (< 5%) = low volatility / coiled spring (big move imminent). Expansion = move is underway.",
+    "Dist Low52w":"<b>Distance from 52-Week Low</b><br>% above the lowest price in the last 52 weeks. Low values (< 20%) mean the stock is near long-term lows = potential reversal/base.",
+    "Dist High52w":"<b>Distance from 52-Week High</b><br>% below the highest price in the last 52 weeks. Small values = near highs (stretched).",
+    "Support":"<b>Support Price (20-Day Low)</b><br>The lowest price in the last 20 sessions. Acts as a downside floor. A break below suggests further weakness.",
+    "Resistance":"<b>Resistance Price (20-Day High)</b><br>The highest price in the last 20 sessions. A break above = breakout, failure at resistance = pullback.",
+    "Short % Float":"<b>Short Interest % of Float</b><br>Percentage of the company's tradable shares that are currently sold short. > 20% = heavily shorted = higher squeeze risk if price rallies.",
+    "Days to Cover":"<b>Days to Cover (Short Ratio)</b><br>Shares short divided by average daily volume. Shows how many days it would take for shorts to exit their positions. > 5 days = very hard to cover quickly = squeeze fuel.",
+    "Shares Short":"<b>Total Shares Short</b><br>Absolute number of shares currently sold short. Higher numbers = bigger potential covering demand if the stock rallies.",
+    "Squeeze Risk":"<b>Squeeze Risk Index</b><br>Composite of short % float and days to cover. Higher values = more dangerous to short because any rally could force short covering and a violent squeeze."
+  };
+  e.stopPropagation();
+  showTooltip(defs[term]||"<b>"+term+"</b><br>No detailed definition available yet.",e.target);
+}
+document.addEventListener('click',function(e){if(tooltipEl&&!tooltipEl.contains(e.target)){hideTooltip();}});
+
+function applyFilters(){
+  const p=parseFloat(document.getElementById('filterPrice').value)||0;
+  const v=parseFloat(document.getElementById('filterVol').value)||0;
+  document.querySelectorAll('tbody tr').forEach(r=>{
+    const rp=parseFloat(r.getAttribute('data-price'))||0;
+    const rv=parseFloat(r.getAttribute('data-vol'))||0;
+    if(rp<p||rv<v) r.classList.add('hidden-row'); else r.classList.remove('hidden-row');
+  });
+}
+function resetFilters(){
+  document.getElementById('filterPrice').value=1;
+  document.getElementById('filterVol').value=100000;
+  document.querySelectorAll('tbody tr').forEach(r=>r.classList.remove('hidden-row'));
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/service-worker.js'); }
+</script>
+</body>
+</html>
