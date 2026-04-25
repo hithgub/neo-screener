@@ -1,36 +1,27 @@
-name: Daily Screener
+ yaml
+     name: Daily Screener
 
-on:
-  schedule:
-    # 8:00 AM PST / 11:00 AM EST (16:00 UTC) every day
-    - cron: '0 16 * * *'
-    # Hourly during US market hours (13:30-21:00 UTC = 6:30 AM - 2:00 PM PDT)
-    - cron: '30 13-20 * * 1-5'
-  workflow_dispatch:
+     on:
+       schedule:
+         - cron: '0 16   '
+         - cron: '30 13-20  * 1-5'
+       workflow_dispatch:
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+     permissions:
+       contents: write
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          pip install pandas numpy yfinance requests lxml html5lib beautifulsoup4
-
-      - name: Run screener
-        run: python daily_screener.py
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
-          publish_branch: gh-pages
+     jobs:
+       build:
+         runs-on: ubuntu-latest
+         steps:
+           - uses: actions/checkout@v4
+           - uses: actions/setup-python@v5
+             with:
+               python-version: '3.11'
+           - run: pip install pandas numpy yfinance requests lxml html5lib beautifulsoup4
+           - run: python daily_screener.py
+           - uses: peaceiris/actions-gh-pages@v4
+             with:
+               github_token: ${{ secrets.GITHUB_TOKEN }}
+               publish_dir: ./
+               exclude_assets: '.github,.gitignore,reports'
