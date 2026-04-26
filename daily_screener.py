@@ -186,7 +186,8 @@ def generate_market_summary():
             if sym in summary:
                 s = summary[sym]
                 emoji = "↑" if s["chg_1d"] >= 0 else "↓"
-                html += f'<li>{s["label"]}: <strong>${s["price"]:.2f}</strong> ({emoji} {s["chg_1d"]:+.2f}%)</li>\n'
+                c = _c(s["chg_1d"])
+                html += f'<li>{s["label"]}: <strong>${s["price"]:.2f}</strong> ({emoji} <span style="color:{c};">{s["chg_1d"]:+.2f}%</span>)</li>\n'
         if "VIX" in summary:
             v = summary["VIX"]
             html += f'<li>VIX: <strong>${v["price"]:.2f}</strong> (fear gauge)</li>\n'
@@ -525,6 +526,107 @@ def _make_squeeze_rows(df):
             f'<td data-sort="{r["Resistance"]}">${r["Resistance"]:.2f}</td>'
             f'</tr>')
     return "\n".join(html)
+def fetch_crypto_data():
+    """Fetch top crypto tickers. Returns dict of ticker > dataframe."""
+    crypto_tickers = [
+        "BTC-USD","ETH-USD","SOL-USD","XRP-USD","DOGE-USD","ADA-USD",
+        "AVAX-USD","DOT-USD","LINK-USD","LTC-USD","UNI-USD","MATIC-USD",
+        "ATOM-USD","BCH-USD","ETC-USD","ICP-USD","XLM-USD","NEAR-USD",
+        "FIL-USD","ALGO-USD","VET-USD","AAVE-USD","SUSHI-USD","MKR-USD",
+        "YFI-USD","COMP-USD","ZRX-USD","MANA-USD","SAND-USD","AXS-USD",
+        "FTM-USD","THETA-USD","GRT-USD","CHZ-USD","ENJ-USD","BAT-USD",
+        "REN-USD","BNT-USD","CRV-USD","LRC-USD","STORJ-USD","NMR-USD"
+    ]
+    out = {}
+    end = datetime.now(); start_d = end - timedelta(days=8)
+    try:
+        data = yf.download(crypto_tickers, start=start_d.strftime("%Y-%m-%d"),
+                           end=end.strftime("%Y-%m-%d"), interval="1d",
+                           group_by="ticker", auto_adjust=True, progress=False)
+        for t in crypto_tickers:
+            try:
+                if len(crypto_tickers) == 1:
+                    df = data.copy()
+                else:
+                    df = data[t].copy()
+                if not df.empty: out[t] = df
+            except: pass
+    except Exception as e:
+        print(f"[CRYPTO WARN] batch failed: {e}")
+    for t in crypto_tickers:
+        if t in out: continue
+        try:
+            s = yf.download(t, start=start_d.strftime("%Y-%m-%d"),
+                           end=end.strftime("%Y-%m-%d"), interval="1d",
+                           auto_adjust=True, progress=False)
+            if s is not None and not s.empty: out[t] = s
+        except: pass
+
+    # Try 1h for recent price action
+    start_h = end - timedelta(days=7)
+    out_1h = {}
+    for t in list(out.keys()):
+        try:
+            h = yf.download(t, start=start_h.strftime("%Y-%m-%d"),
+                           end=end.strftime("%Y-%m-%d"), interval="1h",
+                           auto_adjust=True, progress=False)
+            if h is not None and len(h) > 2:
+                out_1h[t] = h
+        except: pass
+    return out, out_1h
+
+def screen_crypto(daily_data, hourly_data):
+    """Screen top crypto by daily % gain (fallback to hourly if daily sparse)."""
+    rows = []
+    for ticker, df in daily_data.items():
+        try:
+            close = df["Close"].dropna()
+            vol  = df["Volume"].dropna()
+            if len(close) < 2: continue
+            price = float(close.iloc[-1])
+            chg_1d = (close.iloc[-1]/close.iloc[-2]-1)*100 if len(close)>=2 else 0
+            chg_7d = (close.iloc[-1]/close.iloc[0]-1)*100 if len(close)>=7 else 0
+            avg_vol = vol.rolling(20).mean().iloc[-1] if len(vol) > 0 else 0
+            vol_ratio = (vol.iloc[-1] / avg_vol) if avg_vol > 0 else 1
+
+            # 1h change
+            chg_1h = 0.0
+            if ticker in hourly_data:
+                h_close = hourly_data[ticker]["Close"].dropna()
+                if len(h_close) >= 2:
+                    chg_1h = (h_close.iloc[-1]/h_close.iloc[-2]-1)*100
+
+            symbol = ticker.replace("-USD","")
+            rows.append({
+                "Symbol": symbol, "Price": round(price,2),
+                "Chg_1H": round(chg_1h,2), "Chg_1D": round(chg_1d,2),
+                "Chg_7D": round(chg_7d,2), "VolRatio": round(vol_ratio,2),
+                "Abs_1D": abs(chg_1d)  # for sorting
+            })
+        except: pass
+    df_out = pd.DataFrame(rows)
+    if not df_out.empty:
+        df_out = df_out.sort_values("Abs_1D", ascending=False).reset_index(drop=True)
+    return df_out
+
+def _make_crypto_rows(df):
+    html = []
+    for _, r in df.head(20).iterrows():
+        c1h = "#68d670" if r["Chg_1H"] >= 0 else "#ff6b6b"
+        c1d = "#68d670" if r["Chg_1D"] >= 0 else "#ff6b6b"
+        c7d = "#68d670" if r["Chg_7D"] >= 0 else "#ff6b6b"
+        html.append(
+            f'<tr data-1h="{r["Chg_1H"]}" data-1d="{r["Chg_1D"]}">'
+            f'<td><strong>{r["Symbol"]}</strong></td>'
+            f'<td data-sort="{r["Price"]}">${r["Price"]}</td>'
+            f'<td data-sort="{r["Chg_1H"]}"><span style="color:{c1h};">{r["Chg_1H"]:+.2f}%</span></td>'
+            f'<td data-sort="{r["Chg_1D"]}"><span style="color:{c1d};">{r["Chg_1D"]:+.2f}%</span></td>'
+            f'<td data-sort="{r["Chg_7D"]}"><span style="color:{c7d};">{r["Chg_7D"]:+.2f}%</span></td>'
+            f'<td data-sort="{r["VolRatio"]}">{r["VolRatio"]}x</td>'
+            f'</tr>'
+        )
+    return "\n".join(html)
+
 def generate_report(df_overext, df_short, df_squeeze, summary_html):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     summary_block = ""
@@ -532,10 +634,12 @@ def generate_report(df_overext, df_short, df_squeeze, summary_html):
         summary_block = f'<div class="summary-box">{summary_html}</div>'
     with open(TMPL_PATH, "r", encoding="utf-8") as f:
         tmpl = f.read()
+    crypto_rows = _make_crypto_rows(df_crypto) if df_crypto is not None and not df_crypto.empty else "<tr><td colspan='6'>Crypto data unavailable</td></tr>"
     html = tmpl.replace("{{TS}}", ts).replace("{{SUMMARY_BLOCK}}", summary_block) \
         .replace("{{OVEREXT_ROWS}}", _make_overext_rows(df_overext)) \
         .replace("{{SHORT_ROWS}}", _make_short_rows(df_short)) \
-        .replace("{{SQUEEZE_ROWS}}", _make_squeeze_rows(df_squeeze))
+        .replace("{{SQUEEZE_ROWS}}", _make_squeeze_rows(df_squeeze)) \
+        .replace("{{CRYPTO_ROWS}}", crypto_rows)
     fname = f"screener_{datetime.now().strftime('%Y%m%d_%H%M')}.html"
     path = os.path.join(REPORTS_DIR, fname)
     with open(path, "w", encoding="utf-8") as f:
@@ -561,6 +665,11 @@ if __name__ == "__main__":
     shorts = fetch_short_interest(tickers)
     if shorts.empty: print("[SHORTS] No data.")
     else: print(f"[SHORTS] {len(shorts)} tickers with short interest. Top 5: {', '.join(shorts.head(5)['Ticker'])}")
+    print("[CRYPTO] Fetching crypto data...")
+    crypto_d, crypto_h = fetch_crypto_data()
+    df_crypto = screen_crypto(crypto_d, crypto_h)
+    if df_crypto.empty: print("[CRYPTO] No data.")
+    else: print(f"[CRYPTO] {len(df_crypto)} coins. Top 5: {', '.join(df_crypto.head(5)['Symbol'])}")
     summary_html = generate_market_summary()
-    report_path = generate_report(overext, shorts, squeeze, summary_html)
+    report_path = generate_report(overext, shorts, squeeze, df_crypto, summary_html)
     print(f"[REPORT] Saved: {report_path}")

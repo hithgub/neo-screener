@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Daily Screener — {{TS}}</title>
 <style>
-:root { --bg:#0b0c15; --panel:#121420; --accent:#3b82f6; --text:#e2e8f0; --muted:#8b9bb4; --border:#2a2f45; }
+:root { --bg:#0b0c15; --panel:#121420; --accent:#3b82f6; --gold:#ffc107; --text:#e2e8f0; --muted:#8b9bb4; --border:#2a2f45; }
 body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; margin:0; padding:24px; }
 .container { max-width:1200px; margin:0 auto; }
 h1 { font-size:26px; margin-bottom:4px; letter-spacing:-.5px; }
@@ -29,6 +29,8 @@ tr:hover { background:rgba(59,130,246,.06); }
 .tabs { display:flex; gap:6px; margin-bottom:16px; }
 .tab-btn { background:#1a1d2e; color:var(--muted); border:1px solid var(--border); border-radius:8px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; }
 .tab-btn.active { background:rgba(59,130,246,.15); color:var(--accent); border-color:var(--accent); }
+.tab-btn.gold { border-color:#5c4a1a; }
+.tab-btn.gold.active { background:rgba(255,193,7,.12); color:var(--gold); border-color:var(--gold); }
 .tab-content { display:none; }
 .tab-content.active { display:block; }
 .th-info{ display:inline-block; margin-left:4px; color:var(--muted); cursor:pointer; font-size:11px; background:rgba(59,130,246,.1); border-radius:50%; width:14px; height:14px; line-height:14px; text-align:center; vertical-align:middle; }
@@ -52,6 +54,7 @@ tr:hover { background:rgba(59,130,246,.06); }
   <button class="tab-btn active" onclick="switchTab('overext',this)">Overextended</button>
   <button class="tab-btn" onclick="switchTab('shortint',this)">Short Interest</button>
   <button class="tab-btn" onclick="switchTab('squeeze',this)">Squeeze Radar</button>
+  <button class="tab-btn gold" onclick="switchTab('crypto',this)">🪙 CRYPTO</button>
 </div>
 <div class="legend">
   <span class="badge">Filters:</span>
@@ -116,6 +119,25 @@ tr:hover { background:rgba(59,130,246,.06); }
 <th onclick="sortTable('tblSqueeze',12,'num')">Resistance<span class="th-info" onclick="explainTerm(event,'Resistance')">?</span></th>
 </tr></thead>
 <tbody>{{SQUEEZE_ROWS}}</tbody>
+</table>
+</div>
+
+<div id="crypto" class="tab-content">
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
+  <span style="font-size:12px;color:var(--muted);font-weight:600;">Sort by:</span>
+  <button id="cryptoSort1D" class="tab-btn active" style="padding:5px 12px;font-size:12px;" onclick="sortCrypto('1D')">Daily %</button>
+  <button id="cryptoSort1H" class="tab-btn" style="padding:5px 12px;font-size:12px;" onclick="sortCrypto('1H')">Hourly %</button>
+</div>
+<table id="tblCrypto">
+<thead><tr>
+<th onclick="sortTable('tblCrypto',0,'str')">Coin</th>
+<th onclick="sortTable('tblCrypto',1,'num')">Price</th>
+<th onclick="sortTable('tblCrypto',2,'num')">Chg 1H</th>
+<th onclick="sortTable('tblCrypto',3,'num')">Chg 1D</th>
+<th onclick="sortTable('tblCrypto',4,'num')">Chg 7D</th>
+<th onclick="sortTable('tblCrypto',5,'num')">Vol Ratio</th>
+</tr></thead>
+<tbody>{{CRYPTO_ROWS}}</tbody>
 </table>
 </div>
 
