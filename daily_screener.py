@@ -627,7 +627,7 @@ def _make_crypto_rows(df):
         )
     return "\n".join(html)
 
-def generate_report(df_overext, df_short, df_squeeze, summary_html):
+def generate_report(df_overext, df_short, df_squeeze, df_crypto, summary_html):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
     summary_block = ""
     if summary_html:
