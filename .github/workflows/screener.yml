@@ -1,27 +1,35 @@
- yaml
-     name: Daily Screener
+name: Daily Screener
 
-     on:
-       schedule:
-         - cron: '0 16   '
-         - cron: '30 13-20  * 1-5'
-       workflow_dispatch:
+on:
+  schedule:
+    - cron: '0 16 * * *'
+    - cron: '30 13-20 * * 1-5'
+  workflow_dispatch:
 
-     permissions:
-       contents: write
+permissions:
+  contents: write
 
-     jobs:
-       build:
-         runs-on: ubuntu-latest
-         steps:
-           - uses: actions/checkout@v4
-           - uses: actions/setup-python@v5
-             with:
-               python-version: '3.11'
-           - run: pip install pandas numpy yfinance requests lxml html5lib beautifulsoup4
-           - run: python daily_screener.py
-           - uses: peaceiris/actions-gh-pages@v4
-             with:
-               github_token: ${{ secrets.GITHUB_TOKEN }}
-               publish_dir: ./
-               exclude_assets: '.github,.gitignore,reports'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas numpy yfinance requests lxml html5lib beautifulsoup4
+
+      - name: Run screener
+        run: python daily_screener.py
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
