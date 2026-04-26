@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Daily Screener — Overextended | Short Interest | Squeeze Radar. Author: Hermes Agent | Neo"""
+"""Daily Screener — Overextended | Short Interest | Squeeze Radar. Author: Hermes Agent"""
 import os, warnings, json
 from datetime import datetime, timedelta
 import yfinance as yf
@@ -94,73 +94,171 @@ def compute_macd(df, fast=12, slow=26, signal=9):
 
 def generate_market_summary():
     try:
-        tickers = {"SPY":"S&P 500","QQQ":"Nasdaq 100","IWM":"Russell 2000","VIX":"VIX","DIA":"Dow Jones","XLF":"Financials","XLK":"Technology","XLE":"Energy","XLV":"Health Care"}
+        tickers = {
+            "SPY":"S&P 500","QQQ":"Nasdaq 100","IWM":"Russell 2000",
+            "VIX":"VIX","DIA":"Dow Jones",
+            "XLF":"Financials","XLK":"Technology","XLE":"Energy","XLV":"Health Care"
+        }
         end = datetime.now(); start = end - timedelta(days=60)
-        data = yf.download(list(tickers.keys()), start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"), interval="1d", group_by="ticker", auto_adjust=True, progress=False)
-        if data.empty: return "Market data unavailable."
+        data = yf.download(list(tickers.keys()), start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"),
+                           interval="1d", group_by="ticker", auto_adjust=True, progress=False)
+        if data.empty:
+            return "Market data unavailable."
         summary = {}
-        for sym,label in tickers.items():
+        for sym, label in tickers.items():
             try:
-                if sym not in data.columns.get_level_values(0): continue
+                if sym not in data.columns.get_level_values(0):
+                    continue
                 df = data[sym].dropna()
-                if len(df)<5: continue
+                if len(df) < 5:
+                    continue
                 close = df["Close"]
                 chg_1d = (close.iloc[-1]/close.iloc[-2]-1)*100 if len(close)>=2 else 0
                 chg_5d = (close.iloc[-1]/close.iloc[-6]-1)*100 if len(close)>=6 else 0
-                summary[sym] = {"label":label, "price":close.iloc[-1], "chg_1d":chg_1d, "chg_5d":chg_5d,
-                    "sma20":close.rolling(20).mean().iloc[-1], "sma50":close.rolling(50).mean().iloc[-1], "rsi14":compute_rsi(close).iloc[-1]}
-            except: continue
-        if not summary: return "Market data unavailable."
-        lines=[]
-        lines.append(f"<b>Market Regime — {datetime.now().strftime('%A, %B %d %Y')}</b>")
+                summary[sym] = {
+                    "label": label, "price": close.iloc[-1], "chg_1d": chg_1d, "chg_5d": chg_5d,
+                    "sma20": close.rolling(20).mean().iloc[-1],
+                    "sma50": close.rolling(50).mean().iloc[-1],
+                    "rsi14": compute_rsi(close).iloc[-1]
+                }
+            except:
+                continue
+        if not summary:
+            return "Market data unavailable."
+
+        # Determine vibe / news
         spy = summary.get("SPY",{}); qqq = summary.get("QQQ",{}); vix = summary.get("VIX",{})
-        spy_chg = spy.get("chg_1d",0); qqq_chg = qqq.get("chg_1d",0); vix_val = vix.get("price",15)
-        if spy_chg>=1.0 and qqq_chg>=1.5: vibe="broad buying with tech leadership"
-        elif spy_chg>=0.5: vibe="modest buying across the board"
-        elif spy_chg<=-1.0 and qqq_chg<=-1.5: vibe="broad selling, tech leading the decline"
-        elif spy_chg<=-0.5: vibe="modest selling pressure"
-        elif abs(spy_chg)<0.3 and abs(qqq_chg)<0.5: vibe="choppy / range-bound action"
-        else: vibe="mixed action with rotation"
-        if vix_val>25: news="Elevated fear suggests geopolitical or macro catalysts may be in play."
-        elif vix_val>20: news="Elevated volatility may reflect earnings or Fed-related uncertainty."
-        elif spy_chg>2.0 or qqq_chg>3.0: news="Strong rally could indicate positive macro headlines or AI/tech momentum."
-        elif spy_chg<-2.0: news="Sharp selloff may reflect tariff concerns, rate fears, or global risk-off."
-        else: news="No clear headline-driven extremes — price action is technically driven."
-        c_spy = "<span style='color:#68d670;'>" if spy_chg>=0 else "<span style='color:#ff6b6b;'>"
-        c_qqq = "<span style='color:#68d670;'>" if qqq_chg>=0 else "<span style='color:#ff6b6b;'>"
-        lines.append(f"<div style='margin-top:8px;font-size:13px;color:var(--muted);'><i>S&P 500 {c_spy}{spy_chg:+.2f}%</span>, Nasdaq {c_qqq}{qqq_chg:+.2f}%</span> — {vibe}.<br>{news}</i></div>")
-        major=[]
+        spy_chg = spy.get("chg_1d", 0); qqq_chg = qqq.get("chg_1d", 0)
+        vix_val = vix.get("price", 15)
+
+        if spy_chg >= 1.0 and qqq_chg >= 1.5:
+            vibe = "broad buying with tech leadership"
+        elif spy_chg >= 0.5:
+            vibe = "modest buying across the board"
+        elif spy_chg <= -1.0 and qqq_chg <= -1.5:
+            vibe = "broad selling, tech leading the decline"
+        elif spy_chg <= -0.5:
+            vibe = "modest selling pressure"
+        elif abs(spy_chg) < 0.3 and abs(qqq_chg) < 0.5:
+            vibe = "choppy / range-bound action"
+        else:
+            vibe = "mixed action with rotation"
+
+        if vix_val > 25:
+            news = "Elevated fear suggests geopolitical or macro catalysts may be in play."
+        elif vix_val > 20:
+            news = "Elevated volatility may reflect earnings or Fed-related uncertainty."
+        elif spy_chg > 2.0 or qqq_chg > 3.0:
+            news = "Strong rally could indicate positive macro headlines or AI/tech momentum."
+        elif spy_chg < -2.0:
+            news = "Sharp selloff may reflect tariff concerns, rate fears, or global risk-off."
+        else:
+            news = "No clear headline-driven extremes — price action is technically driven."
+
+        overbought = sum(1 for s in summary.values() if s.get("rsi14", 0) > 70)
+        oversold   = sum(1 for s in summary.values() if s.get("rsi14", 0) < 30)
+        if overbought >= 2:
+            breadth = "<span style='color:#ff6b6b;'>⚠ Overbought breadth — mean-reversion risk elevated</span>"
+        elif oversold >= 2:
+            breadth = "<span style='color:#68d670;'>Oversold breadth — bounce potential if support holds</span>"
+        else:
+            breadth = "Breadth: Neutral"
+
+        # Build clean bullet-list HTML
+        def _c(val):
+            return "#68d670" if val >= 0 else "#ff6b6b"
+
+        html = f"""
+        <div style="font-family:system-ui,-apple-system,sans-serif;max-width:900px;margin-bottom:16px;">
+            <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-bottom:10px;border-bottom:1px solid #334155;padding-bottom:6px;">
+                Market Regime — {datetime.now().strftime('%A, %B %d %Y')}
+            </div>
+            <div style="font-size:13px;color:#94a3b8;margin-bottom:14px;line-height:1.5;">
+                <i>S&P 500 <span style="color:{_c(spy_chg)};">{spy_chg:+.2f}%</span>,
+                Nasdaq <span style="color:{_c(qqq_chg)};">{qqq_chg:+.2f}%</span> — {vibe}.<br>{news}</i>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:6px;">Major Indices</div>
+                <ul style="margin:0;padding-left:18px;font-size:13px;color:#cbd5e1;line-height:1.7;">
+        """
         for sym in ["SPY","QQQ","IWM","DIA"]:
-            if sym in summary: s=summary[sym]; emoji="↑" if s["chg_1d"]>=0 else "↓"; major.append(f"{s['label']}: {s['price']:.2f} ({emoji}{s['chg_1d']:+.2f}%)")
-        if major: lines.append(" • ".join(major))
-        if "VIX" in summary: lines.append(f"VIX: {summary['VIX']['price']:.2f}")
-        s=summary.get("SPY")
+            if sym in summary:
+                s = summary[sym]
+                emoji = "↑" if s["chg_1d"] >= 0 else "↓"
+                html += f'<li>{s["label"]}: <strong>${s["price"]:.2f}</strong> ({emoji} {s["chg_1d"]:+.2f}%)</li>\n'
+        if "VIX" in summary:
+            v = summary["VIX"]
+            html += f'<li>VIX: <strong>${v["price"]:.2f}</strong> (fear gauge)</li>\n'
+        html += "</ul></div>\n"
+
+        # Regime
+        s = summary.get("SPY")
         if s:
-            regime=[]
-            if s["price"]>s["sma20"] and s["price"]>s["sma50"]: regime.append("bullish trend")
-            elif s["price"]<s["sma20"] and s["price"]<s["sma50"]: regime.append("bearish trend")
-            else: regime.append("mixed / chop")
-            if s["chg_1d"]<-1.5: regime.append("selling pressure")
-            elif s["chg_1d"]>1.5: regime.append("buying pressure")
-            lines.append(f"S&P 500 regime: {' | '.join(regime)}")
+            regime = []
+            if s["price"] > s["sma20"] and s["price"] > s["sma50"]:
+                regime.append("bullish trend")
+            elif s["price"] < s["sma20"] and s["price"] < s["sma50"]:
+                regime.append("bearish trend")
+            else:
+                regime.append("mixed / chop")
+            if s["chg_1d"] < -1.5:
+                regime.append("selling pressure")
+            elif s["chg_1d"] > 1.5:
+                regime.append("buying pressure")
+            html += f"""
+            <div style="margin-bottom:12px;">
+                <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:4px;">S&P 500 Regime</div>
+                <ul style="margin:0;padding-left:18px;font-size:13px;color:#cbd5e1;line-height:1.6;">
+                    <li>{' | '.join(regime)}</li>
+                </ul>
+            </div>\n"""
+
+        # Leadership
         if "QQQ" in summary and "SPY" in summary:
-            q5=summary["QQQ"]["chg_5d"]; sp5=summary["SPY"]["chg_5d"]; iw=summary.get("IWM",{}).get("chg_5d",0)
-            if q5>sp5 and q5>iw: lines.append("Leadership: Tech-heavy (QQQ outperforming)")
-            elif iw>sp5: lines.append("Leadership: Small-caps (IWM outperforming)")
-            else: lines.append("Leadership: Broad market in sync")
-        sectors=[]
+            q5 = summary["QQQ"]["chg_5d"]
+            sp5 = summary["SPY"]["chg_5d"]
+            iw = summary.get("IWM", {}).get("chg_5d", 0)
+            if q5 > sp5 and q5 > iw:
+                leader = "Tech-heavy (QQQ outperforming)"
+            elif iw > sp5:
+                leader = "Small-caps (IWM outperforming)"
+            else:
+                leader = "Broad market in sync"
+            html += f"""
+            <div style="margin-bottom:12px;">
+                <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:4px;">Leadership (5D)</div>
+                <ul style="margin:0;padding-left:18px;font-size:13px;color:#cbd5e1;line-height:1.6;">
+                    <li>{leader}</li>
+                </ul>
+            </div>\n"""
+
+        # Sectors
+        sectors = []
         for sym in ["XLF","XLK","XLE","XLV"]:
             if sym in summary:
-                s=summary[sym]; sign="+" if s["chg_5d"]>=0 else ""; color="#68d670" if s["chg_5d"]>=0 else "#ff6b6b"
-                sectors.append(f"<span style='color:{color};'>{s['label']} {sign}{s['chg_5d']:.1f}%</span>")
-        if sectors: lines.append("Sectors (5D): "+" • ".join(sectors))
-        overbought=sum(1 for s in summary.values() if s.get("rsi14",0)>70)
-        oversold=sum(1 for s in summary.values() if s.get("rsi14",0)<30)
-        if overbought>=2: lines.append("<span style='color:#ff6b6b;'>⚠ Overbought breadth — mean-reversion risk elevated</span>")
-        elif oversold>=2: lines.append("<span style='color:#68d670;'>Oversold breadth — bounce potential if support holds</span>")
-        else: lines.append("Breadth: Neutral")
-        return "<br>".join(lines)
-    except Exception as e: return f"Market summary error: {e}"
+                s = summary[sym]
+                color = "#68d670" if s["chg_5d"] >= 0 else "#ff6b6b"
+                sectors.append(f'<span style="color:{color};">{s["label"]} {s["chg_5d"]:+.1f}%</span>')
+        if sectors:
+            html += f"""
+            <div style="margin-bottom:12px;">
+                <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:4px;">Sectors (5D)</div>
+                <ul style="margin:0;padding-left:18px;font-size:13px;color:#cbd5e1;line-height:1.6;">
+                    <li>{' • '.join(sectors)}</li>
+                </ul>
+            </div>\n"""
+
+        # Breadth
+        html += f"""
+            <div style="font-size:13px;color:#94a3b8;margin-top:8px;padding-top:6px;border-top:1px solid #334155;">
+                {breadth}
+            </div>
+        </div>
+        """
+        return html.strip()
+    except Exception as e:
+        return f"Market summary error: {e}"
 
 
 def download_batch(tickers, start, end):
